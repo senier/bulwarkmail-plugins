@@ -32,9 +32,9 @@ function parseJson(body) {
 }
 
 /** OCS call with JSON answer; returns ocs.data. */
-export async function ocs(api, origin, path, init = {}, opts = {}) {
+export async function ocs(api, base, path, init = {}, opts = {}) {
   const sep = path.includes('?') ? '&' : '?';
-  const res = await ncRequest(api, `${origin}${path}${sep}format=json`, {
+  const res = await ncRequest(api, `${base}${path}${sep}format=json`, {
     ...init,
     headers: { ...OCS_HEADERS, ...(init.headers ?? {}) },
     responseType: 'text',
@@ -46,8 +46,9 @@ export async function ocs(api, origin, path, init = {}, opts = {}) {
  * A client for one connection: { origin, userId }.
  */
 export function createClient(api, conn) {
-  const { origin, userId } = conn;
-  const fileUrl = (path) => davFilesUrl(origin, userId, path);
+  const { userId } = conn;
+  const base = conn.base ?? conn.origin;
+  const fileUrl = (path) => davFilesUrl(base, userId, path);
 
   async function propfind(path, depth = 1) {
     const res = await ncRequest(api, fileUrl(path), {
@@ -60,7 +61,8 @@ export function createClient(api, conn) {
   }
 
   const client = {
-    origin,
+    origin: conn.origin,
+    base,
     userId,
 
     /** The files and folders in `path`, folders first. */
@@ -171,7 +173,7 @@ export function createClient(api, conn) {
       form.set('permissions', '1');
       if (password) form.set('password', password);
       if (expireDate) form.set('expireDate', expireDate);
-      const data = await ocs(api, origin, '/ocs/v2.php/apps/files_sharing/api/v1/shares', {
+      const data = await ocs(api, base, '/ocs/v2.php/apps/files_sharing/api/v1/shares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: form.toString(),
@@ -184,7 +186,7 @@ export function createClient(api, conn) {
     /** A password that meets the server's password rules. */
     async generatePassword() {
       try {
-        const data = await ocs(api, origin, '/ocs/v2.php/apps/password_policy/api/v1/generate');
+        const data = await ocs(api, base, '/ocs/v2.php/apps/password_policy/api/v1/generate');
         if (typeof data?.password === 'string' && data.password) return data.password;
       } catch { /* the app may be off; fall back */ }
       return localPassword();
@@ -192,16 +194,16 @@ export function createClient(api, conn) {
 
     /** Where to open a file in the Nextcloud web interface. */
     webUrl(entry) {
-      if (entry.fileId) return `${origin}/f/${encodeURIComponent(entry.fileId)}`;
+      if (entry.fileId) return `${base}/f/${encodeURIComponent(entry.fileId)}`;
       const dir = entry.isFolder ? entry.path : parentPath(entry.path);
-      return `${origin}/apps/files/?dir=${encodeURIComponent(dir)}`;
+      return `${base}/apps/files/?dir=${encodeURIComponent(dir)}`;
     },
 
     joinPath,
   };
 
   async function runSearch({ query, recent, limit, signal }) {
-    const res = await ncRequest(api, `${origin}/remote.php/dav/`, {
+    const res = await ncRequest(api, `${base}/remote.php/dav/`, {
       method: 'SEARCH',
       headers: { 'Content-Type': 'text/xml; charset=utf-8' },
       body: searchBody({ userId, query, recent, limit }),

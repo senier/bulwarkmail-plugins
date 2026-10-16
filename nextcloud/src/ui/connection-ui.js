@@ -4,7 +4,7 @@ import { createElement as h, useCallback, useEffect, useRef, useState } from 're
 import {
   Button, EmptyState, Loading, Row, Section, SettingRow, Spinner, Stack, Text,
 } from '@plugin-host/ui';
-import { adminServer, approveServer, disconnect, getConnection, pollLoginFlow, startLoginFlow } from '../lib/connection.js';
+import { adminBase, adminServer, approveServer, disconnect, getConnection, pollLoginFlow, resolveBase, startLoginFlow } from '../lib/connection.js';
 import { NcError, errorText, needsSignIn } from '../lib/errors.js';
 import { hostOf } from '../lib/format.js';
 import { connectedText } from '../lib/account.js';
@@ -52,7 +52,7 @@ export function useConnection(api) {
     try {
       const origin = await approveServer(api, { fixedServer: fixed, suggestedServer: suggestedServer ?? state.conn?.origin });
       if (!origin) { await refresh(); return null; }
-      const flow = await startLoginFlow(api, origin);
+      const flow = await startLoginFlow(api, resolveBase(origin, await adminBase(api)));
       set({ status: 'waiting', fixed, origin, loginUrl: flow.loginUrl });
       await api.ui.openExternalUrl(flow.loginUrl).catch(() => {});
       await pollLoginFlow(api, flow, { signal: controller.signal });

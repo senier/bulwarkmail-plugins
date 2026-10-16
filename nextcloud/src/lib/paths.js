@@ -133,3 +133,19 @@ export function originOf(value) {
     return null;
   }
 }
+
+/**
+ * The origin plus the sub-path Nextcloud is installed under ("https://host/cloud"),
+ * without a trailing slash; null if invalid. Every request URL is built on this.
+ */
+export function baseOf(value) {
+  const origin = originOf(value);
+  if (!origin) return null;
+  const raw = String(value).trim();
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return origin + url.pathname.replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
+}

@@ -30,7 +30,7 @@ export function chunkName(index) {
 export async function listChunks(api, conn, uploadId) {
   let res;
   try {
-    res = await ncRequest(api, davUploadsUrl(conn.origin, conn.userId, uploadId), {
+    res = await ncRequest(api, davUploadsUrl((conn.base ?? conn.origin), conn.userId, uploadId), {
       method: 'PROPFIND',
       headers: { Depth: '1', 'Content-Type': 'application/xml; charset=utf-8' },
       body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getcontentlength/><d:resourcetype/></d:prop></d:propfind>',
@@ -69,7 +69,7 @@ export async function uploadFile(api, conn, file, destPath, {
   onProgress, signal, chunkSize = CHUNK_SIZE, retries = 2, wait = (ms) => new Promise((r) => setTimeout(r, ms)),
 } = {}) {
   const size = file.size;
-  const destUrl = davFilesUrl(conn.origin, conn.userId, destPath);
+  const destUrl = davFilesUrl((conn.base ?? conn.origin), conn.userId, destPath);
   if (size <= chunkSize) {
     await withRetry(() => ncRequest(api, destUrl, {
       method: 'PUT',
@@ -94,7 +94,7 @@ export async function uploadFile(api, conn, file, destPath, {
   const resumed = !!record;
   if (!record) {
     record = { id: newUploadId(), startedAt: Date.now() };
-    await ncRequest(api, davUploadsUrl(conn.origin, conn.userId, record.id), {
+    await ncRequest(api, davUploadsUrl((conn.base ?? conn.origin), conn.userId, record.id), {
       method: 'MKCOL',
       headers: { Destination: destUrl },
       signal,
@@ -118,7 +118,7 @@ export async function uploadFile(api, conn, file, destPath, {
     const name = chunkName(i);
     if (have.get(name) === end - start) continue;
     const base = sent;
-    await withRetry(() => ncRequest(api, davUploadsUrl(conn.origin, conn.userId, record.id, name), {
+    await withRetry(() => ncRequest(api, davUploadsUrl((conn.base ?? conn.origin), conn.userId, record.id, name), {
       method: 'PUT',
       headers: { Destination: destUrl, 'OC-Total-Length': String(size), 'Content-Type': 'application/octet-stream' },
       body: file.slice(start, end),
@@ -129,7 +129,7 @@ export async function uploadFile(api, conn, file, destPath, {
     onProgress?.(sent, size);
   }
 
-  await withRetry(() => ncRequest(api, davUploadsUrl(conn.origin, conn.userId, record.id, '.file'), {
+  await withRetry(() => ncRequest(api, davUploadsUrl((conn.base ?? conn.origin), conn.userId, record.id, '.file'), {
     method: 'MOVE',
     headers: { Destination: destUrl, 'OC-Total-Length': String(size) },
     signal,
@@ -147,7 +147,7 @@ export async function discardUpload(api, conn, file, destPath) {
   const saved = (await api.storage.get(UPLOADS_KEY)) ?? {};
   const record = saved[key];
   if (!record) return false;
-  await ncRequest(api, davUploadsUrl(conn.origin, conn.userId, record.id), { method: 'DELETE' }, { accept: [404] }).catch(() => {});
+  await ncRequest(api, davUploadsUrl((conn.base ?? conn.origin), conn.userId, record.id), { method: 'DELETE' }, { accept: [404] }).catch(() => {});
   delete saved[key];
   await api.storage.set(UPLOADS_KEY, saved);
   return true;

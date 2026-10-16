@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fakeApi, proxyResponse } from '../../test-utils/fake-api.mjs';
 import {
-  adminServer, approveServer, getConnection, startLoginFlow, pollLoginFlow, disconnect,
+  adminBase, adminServer, approveServer, getConnection, startLoginFlow, pollLoginFlow, disconnect, resolveBase,
 } from '../src/lib/connection.js';
 
 const ORIGIN = 'https://cloud.example.com';
@@ -75,6 +75,39 @@ describe('Login Flow v2 through the proxy', () => {
   });
 });
 
+describe('a Nextcloud under a sub-path', () => {
+  const BASE = `${ORIGIN}/nextcloud`;
+
+  it('keeps the sub-path of the fixed server, and only for the approved origin', async () => {
+    const api = fakeApi({ handlers: { 'config.get': async () => ({ serverUrl: 'cloud.example.com/nextcloud/' }) } });
+    expect(await adminBase(api)).toBe(BASE);
+    expect(resolveBase(ORIGIN, BASE)).toBe(BASE);
+    expect(resolveBase('https://other.example', BASE)).toBe('https://other.example');
+    expect(resolveBase(ORIGIN, null)).toBe(ORIGIN);
+  });
+
+  it('starts the login flow below the sub-path and accepts a poll endpoint on the same origin', async () => {
+    const api = fakeApi({ handlers: { 'proxy.fetch': async () => proxyResponse(JSON.stringify({
+      login: `${BASE}/login/v2/flow/x`, poll: { endpoint: `${BASE}/login/v2/poll`, token: 't' },
+    })) } });
+    const flow = await startLoginFlow(api, BASE);
+    expect(api.calls('proxy.fetch')[0].args[1]).toBe(`${BASE}/index.php/login/v2`);
+    expect(flow.endpoint).toBe(`${BASE}/login/v2/poll`);
+  });
+
+  it('builds the user lookup and the connection on the sub-path', async () => {
+    const account = { credentialId: 'nextcloud', origin: ORIGIN, username: 'alice', connected: true };
+    const api = fakeApi({ handlers: {
+      'proxy.accounts': async () => [account],
+      'config.get': async () => ({ serverUrl: BASE }),
+      'proxy.fetch': async () => proxyResponse(JSON.stringify({ ocs: { data: { id: 'alice', displayname: 'Alice' } } })),
+    } });
+    const conn = await getConnection(api);
+    expect(api.calls('proxy.fetch')[0].args[1]).toBe(`${BASE}/ocs/v2.php/cloud/user?format=json`);
+    expect(conn).toMatchObject({ origin: ORIGIN, base: BASE, userId: 'alice' });
+  });
+});
+
 describe('the connection', () => {
   const account = { credentialId: 'nextcloud', origin: ORIGIN, username: 'alice@example.org', connected: true };
 
@@ -89,7 +122,7 @@ describe('the connection', () => {
       'proxy.fetch': async () => proxyResponse(JSON.stringify({ ocs: { data: { id: 'alice', displayname: 'Alice Example' } } })),
     } });
     const conn = await getConnection(api, { fixedServer: null });
-    expect(conn).toEqual({ origin: ORIGIN, username: 'alice@example.org', userId: 'alice', displayName: 'Alice Example' });
+    expect(conn).toEqual({ origin: ORIGIN, base: ORIGIN, username: 'alice@example.org', userId: 'alice', displayName: 'Alice Example' });
     expect(api.calls('proxy.fetch')[0].args[1]).toBe(`${ORIGIN}/ocs/v2.php/cloud/user?format=json`);
     await getConnection(api, { fixedServer: null });
     expect(api.calls('proxy.fetch')).toHaveLength(1);

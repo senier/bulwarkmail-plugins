@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizePath, joinPath, parentPath, baseName, breadcrumb, encodePath, davFilesUrl, davUploadsUrl,
-  hrefToPath, sanitizeFileName, uniqueName, uploadFolder, originOf,
+  hrefToPath, sanitizeFileName, uniqueName, uploadFolder, originOf, baseOf,
 } from '../src/lib/paths.js';
 
 describe('paths', () => {
@@ -65,5 +65,20 @@ describe('paths', () => {
     expect(originOf('http://localhost:18080/')).toBe('http://localhost:18080');
     expect(originOf('ftp://x')).toBeNull();
     expect(originOf('')).toBeNull();
+  });
+});
+
+describe('baseOf', () => {
+  it('keeps the sub-path and drops slashes, query and hash', () => {
+    expect(baseOf('cloud.example.com/nextcloud/')).toBe('https://cloud.example.com/nextcloud');
+    expect(baseOf('https://c.example/a/b/?x=1#y')).toBe('https://c.example/a/b');
+    expect(baseOf('https://c.example/')).toBe('https://c.example');
+    expect(baseOf('ftp://c.example')).toBeNull();
+    expect(baseOf('')).toBeNull();
+  });
+
+  it('builds DAV URLs below the sub-path', () => {
+    expect(davFilesUrl('https://c.example/nextcloud', 'alice', '/a')).toBe('https://c.example/nextcloud/remote.php/dav/files/alice/a');
+    expect(hrefToPath('/nextcloud/remote.php/dav/files/alice/a', 'alice')).toBe('/a');
   });
 });

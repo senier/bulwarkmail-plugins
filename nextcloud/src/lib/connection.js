@@ -5,7 +5,7 @@
 
 import { CREDENTIAL, ncRequest, ocs } from './client.js';
 import { NcError } from './errors.js';
-import { originOf } from './paths.js';
+import { baseOf, originOf } from './paths.js';
 
 export const POLL_INTERVAL_MS = 2000;
 /** Nextcloud keeps a login flow open for 20 minutes. */
@@ -23,6 +23,28 @@ export async function adminServer(api) {
   } catch {
     return null;
   }
+}
+
+/**
+ * The administrator's server including the sub-path Nextcloud lives under
+ * (configSchema serverUrl), or null.
+ */
+export async function adminBase(api) {
+  try {
+    const config = await api.config.get();
+    return baseOf(config?.serverUrl) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The URL prefix for an approved origin: the administrator's server with its
+ * sub-path when it is on that origin, else the bare origin. The host's
+ * credential only knows the origin; the sub-path is not a secret.
+ */
+export function resolveBase(origin, fixedBase) {
+  return fixedBase && originOf(fixedBase) === origin ? fixedBase : origin;
 }
 
 /** The stored account for this plugin, connected or not, or null. */
@@ -51,17 +73,18 @@ export async function getConnection(api, { fixedServer } = {}) {
   if (!account || !account.connected) return null;
   const fixed = fixedServer === undefined ? await adminServer(api) : fixedServer;
   if (fixed && account.origin !== fixed) throw new NcError('wrong_server');
+  const base = resolveBase(account.origin, await adminBase(api));
   const key = userKey(account.origin, account.username);
   const cached = await api.storage.get(key);
   if (cached && typeof cached.userId === 'string' && cached.userId) {
-    return { origin: account.origin, username: account.username ?? '', userId: cached.userId, displayName: cached.displayName ?? '' };
+    return { origin: account.origin, base, username: account.username ?? '', userId: cached.userId, displayName: cached.displayName ?? '' };
   }
-  const data = await ocs(api, account.origin, '/ocs/v2.php/cloud/user');
+  const data = await ocs(api, base, '/ocs/v2.php/cloud/user');
   const userId = typeof data?.id === 'string' && data.id ? data.id : account.username;
   if (!userId) throw new NcError('bad_answer');
   const displayName = typeof data?.displayname === 'string' ? data.displayname : (data?.['display-name'] ?? '');
   await api.storage.set(key, { userId, displayName });
-  return { origin: account.origin, username: account.username ?? '', userId, displayName };
+  return { origin: account.origin, base, username: account.username ?? '', userId, displayName };
 }
 
 /**
@@ -80,9 +103,9 @@ export async function approveServer(api, { fixedServer, suggestedServer } = {}) 
   return origin;
 }
 
-/** Step 2: open a login flow on the server. */
-export async function startLoginFlow(api, origin) {
-  const res = await ncRequest(api, `${origin}/index.php/login/v2`, { method: 'POST', responseType: 'text' });
+/** Step 2: open a login flow on the server; `base` is its URL prefix (see resolveBase). */
+export async function startLoginFlow(api, base) {
+  const res = await ncRequest(api, `${base}/index.php/login/v2`, { method: 'POST', responseType: 'text' });
   let data;
   try { data = JSON.parse(String(res.body)); } catch { throw new NcError('bad_answer', { detail: 'login/v2' }); }
   const loginUrl = data?.login;
@@ -94,7 +117,7 @@ export async function startLoginFlow(api, origin) {
   if (originOf(loginUrl) === null) throw new NcError('bad_answer', { detail: 'login url' });
   // The proxy only sends the poll to the approved server. A Nextcloud whose
   // overwrite settings name another address can't finish the flow.
-  if (originOf(endpoint) !== origin) throw new NcError('blocked', { detail: endpoint });
+  if (originOf(endpoint) !== originOf(base)) throw new NcError('blocked', { detail: endpoint });
   return { loginUrl, endpoint, token };
 }
 
