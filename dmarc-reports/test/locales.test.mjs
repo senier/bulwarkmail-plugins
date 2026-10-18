@@ -7,6 +7,7 @@ import { manifest } from './helpers.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { en, de } = manifest.locales;
+const WEBMAIL_LOCALES = ['ar', 'ca', 'cs', 'da', 'de', 'en', 'es', 'fa', 'fr', 'he', 'hu', 'it', 'ja', 'ko', 'lv', 'mn', 'nb', 'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'tr', 'uk', 'zh', 'zh-TW'];
 const placeholders = (s) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 const sources = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory()
   ? sources(path.join(dir, d.name))
@@ -14,12 +15,31 @@ const sources = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) =
 const code = sources(path.join(here, '../src'));
 
 describe('translations', () => {
-  it('English and German have the same keys and placeholders, none empty', () => {
-    expect(Object.keys(de)).toEqual(Object.keys(en));
+  it('cover every webmail language', () => {
+    expect(Object.keys(manifest.locales).sort()).toEqual([...WEBMAIL_LOCALES].sort());
+  });
+
+  it.each(WEBMAIL_LOCALES)('%s has every key, the same placeholders, none empty', (lang) => {
+    const table = manifest.locales[lang];
+    expect(Object.keys(table)).toEqual(Object.keys(en));
     for (const [key, text] of Object.entries(en)) {
-      expect(de[key].trim(), key).not.toBe('');
-      expect(placeholders(de[key]), key).toEqual(placeholders(text));
+      expect(table[key].trim(), `${lang} ${key}`).not.toBe('');
+      expect(placeholders(table[key]), `${lang} ${key}`).toEqual(placeholders(text));
     }
+  });
+
+  it('keeps the technical words and the option value untranslated', () => {
+    for (const lang of WEBMAIL_LOCALES) {
+      const table = manifest.locales[lang];
+      expect(table['bar.counts'], lang).toContain('DMARC');
+      expect(table['setting.rdns.help'], lang).toContain('off');
+      expect(table['details.col.dkim'], lang).toBe('DKIM');
+      expect(table['details.col.spf'], lang).toBe('SPF');
+    }
+  });
+
+  it('writes plain characters, not \\u escapes', () => {
+    expect(readFileSync(path.join(here, '..', 'manifest.json'), 'utf8')).not.toMatch(/\\u[0-9a-f]{4}/i);
   });
 
   it('every key the code uses exists, including the computed ones', () => {

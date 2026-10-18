@@ -42,6 +42,11 @@ DNS-over-HTTPS because browsers have no DNS of their own.
   Hostnames are therefore looked up unasked only when the message authenticated
   and comes from the reporting organisation; otherwise a **Look up hostnames**
   button waits for you.
+- **If every lookup fails**, the plugin says why under the table. The usual cause
+  is an ad blocker, firewall or DNS filter that blocks the resolver
+  (`cloudflare-dns.com` or `dns.google`), because many of them block DNS-over-HTTPS
+  providers on purpose. Allow the domain, or pick the other resolver in the
+  settings.
 - Only public addresses are looked up (never private, loopback, documentation or
   other special ranges), and only for the rows shown, four at a time. Results are
   cached in the plugin's storage for up to a day.
@@ -79,4 +84,4 @@ The tests use anonymised copies of real reports from Google, Amazon SES, Fastmai
 and Mail.Ru (`test/fixtures/`): the domain is `example.org`, addresses are from the
 documentation ranges and the report IDs are made up.
 
-Only English and German are translated; other languages fall back to English.
+The plugin is translated into all 27 webmail languages.
