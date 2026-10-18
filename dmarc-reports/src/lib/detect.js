@@ -10,12 +10,16 @@ const TYPE = /^(application\/(gzip|x-gzip|zip|x-zip-compressed|xml|octet-stream)
 /** Most reports one message may show. */
 export const MAX_REPORTS = 3;
 
-/** The attachments that look like report files. */
+/**
+ * The attachments that look like report files. The host calls a part "inline"
+ * when its Content-Disposition says so, and Fastmail sends the report that
+ * way, so inline is no reason to skip a part that is named like a report.
+ */
 export function reportAttachments(email) {
   const subjectHit = SUBJECT.test(String(email?.subject ?? ''));
   const list = Array.isArray(email?.attachments) ? email.attachments : [];
   return list
-    .filter((a) => a && a.blobId && !a.inline && Number(a.size) > 0)
+    .filter((a) => a && a.blobId && Number(a.size) > 0)
     .filter((a) => NAME.test(a.name ?? '') || (subjectHit && (FILE.test(a.name ?? '') || TYPE.test(a.type ?? ''))))
     .slice(0, MAX_REPORTS);
 }

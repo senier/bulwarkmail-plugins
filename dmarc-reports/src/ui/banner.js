@@ -6,12 +6,14 @@ import { BarButton, InfoBar, Loading, Row, Text } from '@plugin-host/ui';
 import { MAX_XML_BYTES, unpackReport } from '../lib/unpack.js';
 import { parseReport } from '../lib/parse.js';
 import { reportAttachments } from '../lib/detect.js';
+import { makeReportDetails } from './details.js';
 import { senderCheck } from '../lib/sender.js';
 import { barLook, errorKey, periodText } from '../lib/view.js';
 
 export function makeReportBanner(React, api) {
   const { createElement: h, useEffect, useState } = React;
   const t = (key, vars) => api.i18n.t(key, vars);
+  const Details = makeReportDetails(React, api);
 
   async function load(emailId, attachment) {
     const file = await api.email.getAttachment(emailId, attachment.blobId);
@@ -20,6 +22,7 @@ export function makeReportBanner(React, api) {
 
   function ReportBar({ email, attachment }) {
     const [state, setState] = useState({ status: 'loading' });
+    const [expanded, setExpanded] = useState(false);
 
     useEffect(() => {
       let live = true;
@@ -46,13 +49,6 @@ export function makeReportBanner(React, api) {
     const { metadata, policy, totals } = report;
     const org = metadata.org || metadata.email || '?';
     const period = periodText(metadata, api.i18n.getLocale?.());
-    const open = () => api.ui.openDialog({
-      title: t('dialog.title', { domain: policy.domain || '?' }),
-      slot: 'plugin-dialog',
-      extraProps: { report, verdict: check.verdict },
-      width: 900,
-    });
-
     return h('div', { 'data-dmarc-report': report.policy.domain },
       h(InfoBar, { tone, icon, eyebrow: t('bar.eyebrow'), title: t('bar.title', { domain: policy.domain || '?', org }) },
         period ? h(Text, { tone: 'muted' }, period) : null,
@@ -67,7 +63,8 @@ export function makeReportBanner(React, api) {
         check.verdict === 'unknown'
           ? h(Text, { tone: 'muted' }, t('bar.unverified'))
           : null,
-        h(Row, { gap: 2 }, h(BarButton, { icon: 'chart-bar', onClick: open }, t('bar.details')))));
+        h(Row, { gap: 2 }, h(BarButton, { icon: expanded ? 'chevron-up' : 'chevron-down', active: expanded, onClick: () => setExpanded((v) => !v) }, t('bar.details')))),
+      expanded ? h(Details, { report, verdict: check.verdict }) : null);
   }
 
   return function ReportBanner(props) {
