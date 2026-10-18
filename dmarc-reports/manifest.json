@@ -1,7 +1,7 @@
 {
   "id": "dmarc-reports",
   "name": "DMARC reports",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "senier",
   "description": "Shows DMARC aggregate reports mailed to you as a summary above the message, expandable to a table of every sending source, with optional reverse DNS.",
   "type": "ui-extension",
@@ -80,7 +80,15 @@
       "details.host.mismatch": "unconfirmed",
       "details.host.mismatchHelp": "The hostname's own address record does not point back to this address, so the name may be made up by whoever owns the address.",
       "details.host.none": "no reverse name",
-      "details.host.error": "lookup failed"
+      "details.host.error": "lookup failed",
+      "details.problem.permission": "The webmail has not given this plugin permission to look up hostnames (http:fetch). Remove the plugin and install it again, or re-enable it so the permission is granted.",
+      "details.problem.origin": "The webmail does not allow this plugin to reach {resolver}. Install version 1.1.0 or newer of the plugin.",
+      "details.problem.network": "The browser could not reach {resolver}. It may be blocked by an ad blocker, a firewall or a DNS filter, the resolver may be down, or you are offline. Try the other resolver in the plugin settings.",
+      "details.problem.http": "{resolver} answered with an error ({detail}).",
+      "details.problem.timeout": "{resolver} did not answer in time.",
+      "details.problem.answer": "{resolver} sent an answer the plugin could not read.",
+      "details.problem.dns": "{resolver} could not resolve the address ({detail}). A DNSSEC failure or a broken reverse zone causes this.",
+      "details.problem.other": "The lookup failed: {detail}"
     },
     "de": {
       "bar.eyebrow": "DMARC-Bericht",
@@ -131,7 +139,15 @@
       "details.host.mismatch": "unbestätigt",
       "details.host.mismatchHelp": "Der Adresseintrag des Hostnamens zeigt nicht auf diese Adresse zurück, der Name kann also vom Inhaber der Adresse frei erfunden sein.",
       "details.host.none": "kein Reverse-Name",
-      "details.host.error": "Abfrage fehlgeschlagen"
+      "details.host.error": "Abfrage fehlgeschlagen",
+      "details.problem.permission": "Die Webmail hat diesem Plugin die Berechtigung zum Nachschlagen von Hostnamen (http:fetch) nicht erteilt. Entfernen Sie das Plugin und installieren Sie es erneut, oder aktivieren Sie es neu, damit die Berechtigung erteilt wird.",
+      "details.problem.origin": "Die Webmail erlaubt diesem Plugin nicht, {resolver} zu erreichen. Installieren Sie Version 1.1.0 oder neuer des Plugins.",
+      "details.problem.network": "Der Browser konnte {resolver} nicht erreichen. Möglicherweise blockiert ein Werbeblocker, eine Firewall oder ein DNS-Filter die Verbindung, der Resolver ist gestört, oder Sie sind offline. Versuchen Sie den anderen Resolver in den Plugin-Einstellungen.",
+      "details.problem.http": "{resolver} antwortete mit einem Fehler ({detail}).",
+      "details.problem.timeout": "{resolver} hat nicht rechtzeitig geantwortet.",
+      "details.problem.answer": "{resolver} hat eine Antwort gesendet, die das Plugin nicht lesen konnte.",
+      "details.problem.dns": "{resolver} konnte die Adresse nicht auflösen ({detail}). Ursache ist ein DNSSEC-Fehler oder eine defekte Reverse-Zone.",
+      "details.problem.other": "Die Abfrage ist fehlgeschlagen: {detail}"
     }
   }
 }

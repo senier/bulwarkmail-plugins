@@ -26,6 +26,7 @@ describe('translations', () => {
     const used = new Set([...code.matchAll(/\bt\(\s*'([A-Za-z.]+)'/g)].map((m) => m[1]));
     for (const code of ['unsupported', 'too_big', 'corrupt', 'doctype', 'invalid', 'not_dmarc', 'other']) used.add(errorKey({ code }));
     for (const col of ['ip', 'host', 'count', 'disposition', 'dkim', 'spf', 'from', 'auth']) used.add(`details.col.${col}`);
+    for (const reason of ['permission', 'origin', 'network', 'http', 'timeout', 'answer', 'dns', 'other']) used.add(`details.problem.${reason}`);
     expect(used.size).toBeGreaterThan(20);
     for (const key of used) expect(en[key], key).toBeTypeOf('string');
   });
@@ -38,7 +39,7 @@ describe('translations', () => {
   });
 
   it('no key is unused', () => {
-    const computed = /^(error\.|details\.col\.|setting\.)/;
+    const computed = /^(error\.|details\.col\.|details\.problem\.|setting\.)/;
     for (const key of Object.keys(en)) {
       if (computed.test(key)) continue;
       expect(code.includes(`'${key}'`), key).toBe(true);

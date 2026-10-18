@@ -39,6 +39,23 @@ export function normalizeHost(value) {
   return labels.every((l) => /^[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?$/.test(l)) ? host : null;
 }
 
+/**
+ * Why a lookup failed, in terms a person can act on. Browsers hide the cause
+ * of a blocked cross-origin request behind "Failed to fetch", so that one is
+ * only ever "network": offline, a filter or ad blocker, or CORS.
+ */
+export function classifyError(error) {
+  const message = String(error?.message ?? error ?? '');
+  if (/lacks permission/i.test(message)) return 'permission';
+  if (/httpOrigins|redirected to/i.test(message)) return 'origin';
+  if (/^timeout$/i.test(message)) return 'timeout';
+  if (/^http \d+/.test(message)) return 'http';
+  if (/^dns status/.test(message)) return 'dns';
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) return 'network';
+  if (/json|bad answer|unexpected token|unexpected end/i.test(message)) return 'answer';
+  return 'other';
+}
+
 function withTimeout(promise, ms) {
   let timer;
   const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), ms); });
@@ -152,7 +169,10 @@ export function makeResolver(api, { now = () => Date.now(), concurrency = 4, tim
       },
       (error) => {
         api.log.warn('dmarc-reports: reverse lookup failed', error?.message);
-        const out = { ip: parsed.text, status: 'error', host: null, verified: null, dnssec: false, expires: now() + TTL_ERROR };
+        const out = {
+          ip: parsed.text, status: 'error', reason: classifyError(error), detail: String(error?.message ?? error ?? '').slice(0, 160),
+          host: null, verified: null, dnssec: false, expires: now() + TTL_ERROR,
+        };
         memory.set(parsed.text, out);
         return out;
       },

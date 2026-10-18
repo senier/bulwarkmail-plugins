@@ -159,6 +159,7 @@ describe('the details, in place', () => {
 
 describe('reverse DNS in the details', () => {
   const google = () => zip(publicIps(fixture('google')));
+  const message_ = () => message();
 
   it('is off by default: no request, and a line saying how to turn it on', async () => {
     const api = apiWith(google());
@@ -220,5 +221,17 @@ describe('reverse DNS in the details', () => {
     await expand();
     await waitFor(() => expect(screen.getAllByText('lookup failed').length).toBeGreaterThan(0));
     expect(screen.getByText('8.8.8.8')).toBeTruthy();
+  });
+
+  it.each([
+    [new TypeError('Failed to fetch'), /could not reach Cloudflare\. It may be blocked by an ad blocker, a firewall or a DNS filter/],
+    [new Error('Plugin "dmarc-reports" lacks permission "http:fetch"'), /has not given this plugin permission to look up hostnames \(http:fetch\)/],
+    [new Error('Origin https://cloudflare-dns.com not in plugin httpOrigins allowlist'), /does not allow this plugin to reach Cloudflare/],
+  ])('tells the reason under the table instead of a bare "lookup failed" (%s)', async (error, message) => {
+    const api = apiWith(google(), { settings: { rdns: 'cloudflare' }, handlers: { 'http.fetch': async () => { throw error; } } });
+    await show(api, message_());
+    await expand();
+    await waitFor(() => expect(screen.getAllByRole('alert').some((el) => message.test(el.textContent))).toBe(true));
+    expect(document.querySelector(`[title="${String(error.message).replaceAll('"', '&quot;')}"]`) ?? document.querySelector('[title]')).toBeTruthy();
   });
 });

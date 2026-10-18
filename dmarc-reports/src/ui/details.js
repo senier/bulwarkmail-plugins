@@ -31,7 +31,7 @@ export function makeReportDetails(React, api, resolver = makeResolver(api)) {
             : h('span', { title: t('details.host.mismatchHelp') }, h(Badge, { tone: 'warning' }, t('details.host.mismatch'))),
           result.dnssec ? h(Badge, { tone: 'info' }, 'DNSSEC') : null);
       case 'none': return h(Text, { tone: 'muted' }, t('details.host.none'));
-      case 'error': return h(Text, { tone: 'muted' }, t('details.host.error'));
+      case 'error': return h('span', { title: result.detail || result.reason }, h(Text, { tone: 'muted' }, t('details.host.error')));
       default: return '–';
     }
   }
@@ -71,6 +71,16 @@ export function makeReportDetails(React, api, resolver = makeResolver(api)) {
       return () => { live = false; };
     }, [lookupNow, rows]);
 
+    // The most common reason lookups failed, said once under the table.
+    const problem = (() => {
+      const counts = new Map();
+      for (const r of Object.values(hosts)) {
+        if (r.status === 'error') counts.set(r.reason, { n: (counts.get(r.reason)?.n ?? 0) + 1, detail: r.detail });
+      }
+      const [reason, info] = [...counts.entries()].sort((a, b) => b[1].n - a[1].n)[0] ?? [];
+      return reason ? { reason, detail: info.detail } : null;
+    })();
+
     return h(Panel, null,
       h(Stack, { gap: 4 },
         h('div', null,
@@ -102,6 +112,9 @@ export function makeReportDetails(React, api, resolver = makeResolver(api)) {
                 h(Text, { tone: 'muted' }, t('details.rdnsHold', { resolver: resolver.label() })))
               : null,
             lookupNow ? h(Text, { tone: 'muted' }, t('details.rdnsVia', { resolver: resolver.label() })) : null,
+            problem
+              ? h('div', { role: 'alert' }, h(Text, { tone: 'danger' }, t(`details.problem.${problem.reason}`, { resolver: resolver.label(), detail: problem.detail || '' })))
+              : null,
             h('div', { style: { overflow: 'auto', maxHeight: 480 } },
               h('table', { style: { borderCollapse: 'collapse', width: '100%', fontSize: '0.9em' } },
                 h('thead', null, h('tr', null, COLUMNS.map((key) => h('th', { key, style: head, scope: 'col' }, t(`details.col.${key}`))))),

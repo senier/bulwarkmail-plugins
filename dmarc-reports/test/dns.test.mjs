@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeApi } from '../../test-utils/fake-api.mjs';
-import { RESOLVERS, makeResolver, normalizeHost } from '../src/lib/dns.js';
+import { RESOLVERS, classifyError, makeResolver, normalizeHost } from '../src/lib/dns.js';
 import { ptrName } from '../src/lib/ip.js';
 import { manifest } from './helpers.mjs';
 
@@ -183,6 +183,33 @@ describe('failures, caching and politeness', () => {
     expect(t.fetched()).toBe(14);
     expect(peak).toBeLessThanOrEqual(4);
     expect(peak).toBeGreaterThan(1);
+  });
+});
+
+describe('why a lookup failed', () => {
+  it.each([
+    ['Plugin "dmarc-reports" lacks permission "http:fetch"', 'permission'],
+    ['Plugin "dmarc-reports" has no httpOrigins declared', 'origin'],
+    ['Origin https://dns.google not in plugin httpOrigins allowlist', 'origin'],
+    ['Request was redirected to https://x.example, which is not in plugin httpOrigins allowlist', 'origin'],
+    ['timeout', 'timeout'],
+    ['http 502', 'http'],
+    ['dns status 2', 'dns'],
+    ['Failed to fetch', 'network'],
+    ['NetworkError when attempting to fetch resource.', 'network'],
+    ['Load failed', 'network'],
+    ['Unexpected token < in JSON at position 0', 'answer'],
+    ['bad answer', 'answer'],
+    ['something else', 'other'],
+  ])('%s is %s', (message, reason) => {
+    expect(classifyError(new Error(message))).toBe(reason);
+  });
+
+  it('carries the reason and the browser\'s own words on the error result', async () => {
+    const t = dns({ 'PTR 8.8.8.8.in-addr.arpa': () => { throw new TypeError('Failed to fetch'); } });
+    expect(await t.resolver.lookup('8.8.8.8')).toMatchObject({ status: 'error', reason: 'network', detail: 'Failed to fetch' });
+    const denied = dns({ 'PTR 8.8.8.8.in-addr.arpa': () => { throw new Error('Plugin "x" lacks permission "http:fetch"'); } });
+    expect(await denied.resolver.lookup('8.8.8.8')).toMatchObject({ reason: 'permission' });
   });
 });
 
